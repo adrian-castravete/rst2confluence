@@ -57,6 +57,8 @@ class ConfluenceTranslator(nodes.NodeVisitor):
         'visit_line',
         'visit_raw',
         'visit_tgroup'
+        'visit_transition',
+        'depart_transition'
     ]
 
     inCode = False
@@ -97,6 +99,7 @@ class ConfluenceTranslator(nodes.NodeVisitor):
         self.block = False
         self.footnote = False
         self.field_body = False
+        self._hide_text = False
 
         for method in self.empty_methods:
             setattr(self, method, lambda n: None)
@@ -126,11 +129,12 @@ class ConfluenceTranslator(nodes.NodeVisitor):
         return "".join(self.content)
 
     def unknown_visit(self, node):
-        raise Exception("Unknown visit on line %s: %s." % (node.line, repr(node)))
+        pass
+        #raise Exception("Unknown visit on line %s: %s." % (node.line, repr(node)))
 
     def unknown_departure(self, node):
-        raise Exception("Unknown departure on line %s: %s." % (node.line, repr(node)))
-
+        pass
+        #raise Exception("Unknown departure on line %s: %s." % (node.line, repr(node)))
 
     def visit_paragraph(self, node):
         if not self.first and not self.footnote and not self.field_body and self.list_level == 0:
@@ -144,9 +148,12 @@ class ConfluenceTranslator(nodes.NodeVisitor):
         self.first = False
 
     def visit_Text(self, node):
+        if self._hide_text:
+            return
         string = node.astext()
         if not self.inCode:
             string = string.replace("[", "\[").replace('{', '&#123;').replace('}', '&#125;')
+
         if self.keepLineBreaks:
             self._add(string)
         else:
@@ -253,7 +260,7 @@ class ConfluenceTranslator(nodes.NodeVisitor):
         self.inCode = False
         self._newline()
         self._add('{code}')
-        self._newline()
+        # self._newline()
 
     def visit_literal(self, node):
         self._add_space_when_needed()
@@ -324,19 +331,20 @@ class ConfluenceTranslator(nodes.NodeVisitor):
         self.do_depart_admonition()
 
     def visit_note(self, node):
-        self._add("{note}")
+        self._add("{quote}*Note:*")
         self.do_visit_admonition()
+        self._newline()
 
     def depart_note(self, node):
-        self._add("{note}")
+        self._add("{quote}")
         self.do_depart_admonition()
 
     def visit_tip(self, node):
-        self._add("{tip}")
+        self._add("{quote}*Tip:*")
         self.do_visit_admonition()
 
     def depart_tip(self, node):
-        self._add("{tip}")
+        self._add("{quote}")
         self.do_depart_admonition()
 
     def visit_docinfo(self, node):
@@ -409,11 +417,11 @@ class ConfluenceTranslator(nodes.NodeVisitor):
         pass
 
     def visit_warning(self, node):
-        self._add("{warning}")
+        self._add("{quote}*Warning!*")
         self.do_visit_admonition()
 
     def depart_warning(self, node):
-        self._add("{warning}")
+        self._add("{quote}")
         self.do_depart_admonition()
 
     #admonition helpers
@@ -622,7 +630,6 @@ class ConfluenceTranslator(nodes.NodeVisitor):
     def depart_system_message(self, node):
         self._add("{warning}")
 
-
     #field lists
     def visit_field_list(self, node):
         self._newline()
@@ -672,3 +679,10 @@ class ConfluenceTranslator(nodes.NodeVisitor):
     #substitution definitions
     def visit_substitution_definition(self, node):
         raise nodes.SkipNode
+
+    def visit_raw(self, node):
+        self._hide_text = True
+
+    def depart_raw(self, node):
+        self._hide_text = False
+
